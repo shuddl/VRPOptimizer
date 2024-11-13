@@ -1,0 +1,178 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VRP Optimizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="card">
+            <h1>VRP Optimizer</h1>
+            <p>Optimize your vehicle routes with LIFO constraints</p>
+        </header>
+
+        <main>
+            <!-- File Upload Section -->
+            <section class="card">
+                <h2>Upload Data</h2>
+                <form id="uploadForm" class="form-group">
+                    <label for="fileInput" class="form-label">Select Excel File</label>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" class="form-input">
+                    <button type="submit" class="button button-primary">
+                        Upload and Optimize
+                    </button>
+                </form>
+                <div id="uploadProgress" class="alert" style="display: none;"></div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results" style="display: none;">
+                <!-- Metrics Overview -->
+                <div class="metrics-panel">
+                    <div class="metric-card">
+                        <h3>Total Distance</h3>
+                        <div class="metric-value" id="totalDistance">0</div>
+                        <div class="metric-label">miles</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Total Routes</h3>
+                        <div class="metric-value" id="totalRoutes">0</div>
+                        <div class="metric-label">routes</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Total Cost</h3>
+                        <div class="metric-value" id="totalCost">$0</div>
+                    </div>
+                </div>
+
+                <!-- Map View -->
+                <div class="card">
+                    <h2>Route Map</h2>
+                    <div id="mapContainer" class="map-container"></div>
+                </div>
+
+                <!-- Route Details -->
+                <div class="card">
+                    <h2>Route Details</h2>
+                    <div id="routeDetails">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Route ID</th>
+                                    <th>Stops</th>
+                                    <th>Distance</th>
+                                    <th>Pallets</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routeTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Visualization Section -->
+                <div class="card">
+                    <h2>Analytics</h2>
+                    <div class="chart-container" id="utilizationChart"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Error</h2>
+            <p id="errorMessage"></p>
+            <button onclick="closeErrorModal()" class="button">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Main application logic
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                showProgress('Uploading and processing data...');
+                
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayResults(result);
+                hideProgress();
+                
+            } catch (error) {
+                hideProgress();
+                showError('Error processing file: ' + error.message);
+            }
+        });
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            
+            // Update metrics
+            document.getElementById('totalDistance').textContent = 
+                data.total_distance.toFixed(1);
+            document.getElementById('totalRoutes').textContent = 
+                data.routes.length;
+            document.getElementById('totalCost').textContent = 
+                `$${data.total_cost.toFixed(2)}`;
+
+            // Display map
+            displayMap(data.routes);
+
+            // Update route table
+            updateRouteTable(data.routes);
+
+            // Create utilization chart
+            createUtilizationChart(data.routes);
+        }
+
+        function showProgress(message) {
+            const progress = document.getElementById('uploadProgress');
+            progress.textContent = message;
+            progress.className = 'alert alert-success';
+            progress.style.display = 'block';
+        }
+
+        function hideProgress() {
+            document.getElementById('uploadProgress').style.display = 'none';
+        }
+
+        function showError(message) {
+            const modal = document.getElementById('errorModal');
+            document.getElementById('errorMessage').textContent = message;
+            modal.style.display = 'block';
+        }
+
+        function closeErrorModal() {
+            document.getElementById('errorModal').style.display = 'none';
+        }
+
+        // Add any additional JavaScript functions needed for
+        // map display, chart creation, etc.
+    </script>
+</body>
+</html>

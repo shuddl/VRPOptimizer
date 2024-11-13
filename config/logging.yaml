@@ -1,0 +1,47 @@
+# config/logging.yaml
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+    standard:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        datefmt: "%Y-%m-%d %H:%M:%S"
+    json:
+        (): "pythonjsonlogger.jsonlogger.JsonFormatter"
+        format: "%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d %(funcName)s"
+
+handlers:
+    console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: standard
+        stream: ext://sys.stdout
+
+    file:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: json
+        filename: logs/vrp.log
+        maxBytes: 10485760  # 10MB
+        backupCount: 5
+        encoding: utf8
+
+    error_file:
+        class: logging.handlers.RotatingFileHandler
+        level: ERROR
+        formatter: json
+        filename: logs/error.log
+        maxBytes: 10485760
+        backupCount: 5
+        encoding: utf8
+
+loggers:
+    src:
+        level: INFO
+        handlers: [console, file, error_file]
+        propagate: no
+
+root:
+    level: INFO
+    handlers: [console, file]

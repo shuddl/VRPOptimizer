@@ -1,0 +1,154 @@
+# config/settings.yml
+
+# Application Settings
+app:
+  name: "VRP Optimizer"
+  version: "1.0.0"
+  environment: ${ENV:-development}  # development, staging, production
+  debug: ${DEBUG:-false}
+  secret_key: ${SECRET_KEY:-default_secret_key_change_in_production}
+
+# Server Configuration
+server:
+  api:
+    host: ${API_HOST:-0.0.0.0}
+    port: ${API_PORT:-8000}
+    workers: ${API_WORKERS:-4}
+    timeout: 60
+    cors_origins:
+      - "http://localhost:8501"  # Streamlit UI
+      - "http://localhost:3000"  # Optional: Frontend
+  ui:
+    host: ${UI_HOST:-0.0.0.0}
+    port: ${UI_PORT:-8501}
+
+# Optimization Parameters
+optimization:
+  max_vehicles: ${MAX_VEHICLES:-10}
+  vehicle_capacity: ${VEHICLE_CAPACITY:-26}  # pallets
+  max_distance: ${MAX_DISTANCE:-800.0}  # miles
+  max_computation_time: ${MAX_COMPUTATION_TIME:-300}  # seconds
+  lifo_enabled: true
+  constraints:
+    min_utilization: 0.5  # 50% minimum utilization
+    max_stops_per_route: 10
+    service_time: 30  # minutes per stop
+
+# Geocoding Configuration
+geocoding:
+  provider: ${GEOCODING_PROVIDER:-nominatim}  # nominatim, google, here
+  api_key: ${GEOCODING_API_KEY:-}
+  cache_enabled: true
+  cache_ttl: 2592000  # 30 days in seconds
+  rate_limit:
+    requests: 1
+    period: 1  # seconds
+  timeout: 10  # seconds
+  retry:
+    max_attempts: 3
+    delay: 1  # seconds
+
+# Database Configuration
+database:
+  url: ${DATABASE_URL:-sqlite:///./vrp_optimizer.db}
+  pool_size: ${DB_POOL_SIZE:-5}
+  max_overflow: ${DB_MAX_OVERFLOW:-10}
+  pool_timeout: ${DB_POOL_TIMEOUT:-30}
+  pool_recycle: ${DB_POOL_RECYCLE:-1800}
+
+# Redis Configuration (for caching)
+redis:
+  url: ${REDIS_URL:-redis://localhost:6379/0}
+  password: ${REDIS_PASSWORD:-}
+  ssl: ${REDIS_SSL:-false}
+  timeout: 5
+
+# File Storage
+storage:
+  upload_dir: "data/uploads"
+  cache_dir: "data/cache"
+  max_file_size: 10485760  # 10MB in bytes
+  allowed_extensions:
+    - .xlsx
+    - .xls
+    - .csv
+
+# Security Settings
+security:
+  allowed_hosts:
+    - "localhost"
+    - "127.0.0.1"
+  ssl_enabled: ${SSL_ENABLED:-false}
+  ssl_cert: ${SSL_CERT_PATH:-}
+  ssl_key: ${SSL_KEY_PATH:-}
+  rate_limiting:
+    enabled: true
+    requests: 100
+    period: 60  # seconds
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  log_level: ${LOG_LEVEL:-INFO}
+  metrics_enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+  alerts:
+    email:
+      enabled: ${ALERT_EMAIL_ENABLED:-false}
+      smtp_host: ${SMTP_HOST:-}
+      smtp_port: ${SMTP_PORT:-587}
+      smtp_user: ${SMTP_USER:-}
+      smtp_password: ${SMTP_PASSWORD:-}
+      from_address: ${ALERT_FROM_EMAIL:-}
+      to_addresses: ${ALERT_TO_EMAILS:-}
+    slack:
+      enabled: ${ALERT_SLACK_ENABLED:-false}
+      webhook_url: ${SLACK_WEBHOOK_URL:-}
+
+# Logging Configuration
+logging:
+  level: ${LOG_LEVEL:-INFO}
+  format: json
+  output:
+    file:
+      enabled: true
+      path: logs/vrp_optimizer.log
+      max_size: 10485760  # 10MB
+      backup_count: 5
+    console:
+      enabled: true
+  extra_fields:
+    app: vrp_optimizer
+    environment: ${ENV:-development}
+
+# Performance Tuning
+performance:
+  optimization:
+    parallel_processing: true
+    chunk_size: 1000
+    cache_enabled: true
+    cache_ttl: 3600  # 1 hour in seconds
+  api:
+    response_compression: true
+    request_timeout: 30
+    keep_alive: true
+  geocoding:
+    batch_size: 50
+    parallel_requests: 5
+
+# Development Settings (only used in development environment)
+development:
+  hot_reload: true
+  debug_toolbar: false
+  profiling: false
+  sample_data:
+    enabled: true
+    file: "data/samples/example_shipments.xlsx"
+
+# Test Settings (only used in test environment)
+test:
+  database_url: "sqlite:///:memory:"
+  mock_geocoding: true
+  mock_optimization: false
