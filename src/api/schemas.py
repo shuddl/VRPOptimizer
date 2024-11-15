@@ -1,13 +1,14 @@
-# src/api/schemas.py
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
+
 
 class LocationSchema(BaseModel):
     city: str
     state: str
     lat: Optional[float] = None
     lng: Optional[float] = None
+
 
 class ShipmentSchema(BaseModel):
     id: str
@@ -17,12 +18,14 @@ class ShipmentSchema(BaseModel):
     volume: Optional[float] = None
     weight: Optional[float] = None
 
+
 class RouteSchema(BaseModel):
     id: str
-    stops: List[tuple[str, ShipmentSchema]]
+    stops: List[Tuple[str, ShipmentSchema]]
     total_distance: float
     total_pallets: int
     vehicle_id: str
+
 
 class SolutionSchema(BaseModel):
     routes: List[RouteSchema]
@@ -30,10 +33,12 @@ class SolutionSchema(BaseModel):
     total_cost: float
     unassigned_shipments: List[ShipmentSchema]
 
+
 class OptimizationRequest(BaseModel):
     max_vehicles: Optional[int] = 10
     max_distance: Optional[float] = 800.0
     time_limit: Optional[int] = 30
+
 
 class OptimizationResponse(BaseModel):
     success: bool

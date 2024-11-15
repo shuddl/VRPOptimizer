@@ -22,9 +22,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment
-cp .env.example .env
-# Edit .env with your settings
+
+
 
 # Start the application
 ./scripts/start_api.sh  # Start API server

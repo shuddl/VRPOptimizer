@@ -1,7 +1,6 @@
 # src/database/__init__.py
 """Database module initialization."""
 
-from .database import Database, DatabaseError, DatabaseConnection
+from src.database.database import DatabaseConnection, DatabaseError
 
-__all__ = ['Database', 'DatabaseError', 'DatabaseConnection']
-
+__all__ = ["DatabaseConnection", "DatabaseError"]

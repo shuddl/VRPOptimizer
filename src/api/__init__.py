@@ -6,17 +6,17 @@ from .schemas import (
     RouteSchema,
     SolutionSchema,
     OptimizationRequest,
-    OptimizationResponse
+    OptimizationResponse,
 )
 
 app = FastAPI(title="VRP Optimizer API")
 app.include_router(api_router)
 
 __all__ = [
-    'app',
-    'ShipmentSchema',
-    'RouteSchema',
-    'SolutionSchema',
-    'OptimizationRequest',
-    'OptimizationResponse'
+    "app",
+    "ShipmentSchema",
+    "RouteSchema",
+    "SolutionSchema",
+    "OptimizationRequest",
+    "OptimizationResponse",
 ]

@@ -1,21 +1,27 @@
-# services/optimization_service.py
-
+# src/services/optimization_service.py
+from src.database.database import DatabaseConnection
+from src.services.base_service import BaseService
+from src.core.models import Solution, Route, Shipment
+from src.monitoring.monitoring import MonitoringSystem
+from src.core.settings import Settings
+from src.core.exceptions import OptimizationError, ResourceExhaustedError
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 from typing import List, Dict, Optional
 import numpy as np
-from src.core.models import Solution, Route, Shipment
 import logging
 from datetime import datetime
-from .memory_monitor import MemoryMonitor
+from src.services.cache_manager import CacheManager
+from src.services.custom_constraint_manager import CustomConstraintManager
 
-class OptimizationService:
+class OptimizationService(BaseService):
     """Production-ready optimization service with resource monitoring."""
     
-    def __init__(self, settings: Settings):
-        self.settings = settings
-        self.logger = logging.getLogger(__name__)
-        self.memory_monitor = MemoryMonitor()
+    def __init__(self, settings: Settings, database: DatabaseConnection):
+        super().__init__(settings, database)
+        self.memory_monitor = MonitoringSystem(settings)  # Pass 'settings' here
+        self.cache_manager = CacheManager(settings.REDIS_URL)
+        self.custom_constraint_manager = CustomConstraintManager()
 
     def optimize(self, shipments: List[Shipment]) -> Optional[Solution]:
         """Optimize routes with resource monitoring and safety checks."""
@@ -53,6 +59,13 @@ class OptimizationService:
 
             # Add LIFO constraints
             self._add_lifo_constraints(routing, data, manager)
+
+            # Add time windows constraints
+            self._add_time_windows_constraints(routing, data, manager)
+
+            # Apply custom constraints if enabled
+            if self.settings.FEATURE_CUSTOM_CONSTRAINTS:
+                self.custom_constraint_manager.apply_constraints(routing)
 
             # Set parameters
             search_parameters = self._get_search_parameters()
@@ -115,6 +128,28 @@ class OptimizationService:
         # Implementation here...
         pass
 
+    def _add_time_windows_constraints(self, routing: pywrapcp.RoutingModel,
+                                      data: Dict, manager: pywrapcp.RoutingIndexManager):
+        """Add delivery time window constraints."""
+        time_callback = lambda from_index, to_index: self._get_time_callback(
+            data, manager, from_index, to_index
+        )
+        time_callback_index = routing.RegisterTransitCallback(time_callback)
+        routing.AddDimension(
+            time_callback_index,
+            30,  # Allow 30-minute slack
+            self.settings.MAX_ROUTE_TIME,
+            True,  # Force start cumul to zero
+            'Time'
+        )
+
+    def _get_time_callback(self, data: Dict, manager: pywrapcp.RoutingIndexManager,
+                           from_index: int, to_index: int) -> int:
+        """Time callback implementation."""
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return data['time_matrix'][from_node][to_node]
+
     def _get_search_parameters(self) -> pywrapcp.DefaultRoutingSearchParameters:
         """Create search parameters."""
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
@@ -134,3 +169,30 @@ class OptimizationService:
         """Create solution object from routing solution."""
         # Implementation here...
         pass
+
+    def calculate_environmental_impact(self, solution: Solution) -> Dict[str, float]:
+        """Calculate environmental metrics for routes."""
+        return {
+            'co2_emissions': self._calculate_emissions(solution),
+            'fuel_consumption': self._estimate_fuel_usage(solution),
+            'green_score': self._calculate_sustainability_score(solution)
+        }
+
+    def _calculate_emissions(self, solution: Solution) -> float:
+        """Calculate CO2 emissions based on route distances."""
+        total_distance = solution.total_distance
+        co2_per_mile = 0.404  # Average CO2 emissions per mile for a truck in kg
+        return total_distance * co2_per_mile
+
+    def _estimate_fuel_usage(self, solution: Solution) -> float:
+        """Estimate fuel consumption based on route distances."""
+        total_distance = solution.total_distance
+        fuel_efficiency = 6.5  # Average miles per gallon for a truck
+        return total_distance / fuel_efficiency
+
+    def _calculate_sustainability_score(self, solution: Solution) -> float:
+        """Calculate a sustainability score based on various factors."""
+        co2_emissions = self._calculate_emissions(solution)
+        fuel_consumption = self._estimate_fuel_usage(solution)
+        # Example calculation: lower emissions and fuel consumption result in a higher score
+        return max(0, 100 - (co2_emissions + fuel_consumption) / 10)

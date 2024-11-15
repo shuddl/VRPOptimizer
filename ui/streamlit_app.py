@@ -1,105 +1,120 @@
-# ui/streamlit_app.py
-
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import json
-import io
-import asyncio
-from typing import Optional, Dict, List
-import base64
-import time
 import sys
 from pathlib import Path
-import sys
+
+# Add project root to Python path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import streamlit as st
+import asyncio
+import logging
 import os
+import base64
+import psutil
+from src.core.settings import Settings
+from src.database.database import DatabaseConnection
+from src.services.data_service import DataService
+from src.services.geocoding_service import GeocodingService
+from src.services.optimization_service import OptimizationService
+from src.services.visualization_service import VisualizationService
+from src.services.business_intelligence_service import BusinessIntelligenceService
+from src.monitoring.monitoring import MonitoringSystem
+from ui.components import RouteMap, ShipmentTable, MetricsPanel
+from datetime import datetime, timedelta
+import pandas as pd
+from src.core.async_utils import AsyncLoopManager
 
-print(f"Python version: {sys.version}")
-print(f"Python executable: {sys.executable}")
-print(f"Environment variables: {os.environ}")
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
-# Import our services and models
-from src.core.config import Settings
-from src.database import Database
-from src.services import (
-    DataService,
-    GeocodingService,
-    OptimizationService,
-    VisualizationService
-)
-from src.monitoring import MonitoringSystem
-from src.core.exceptions import VRPOptimizerError
-from ui.components import RouteMap, MetricsPanel, ShipmentTable
-
-async def initialize_services():
-    """Initialize all required services with database connection."""
-    try:
-        # Initialize settings
-        settings = Settings()
-        
-        # Initialize database
-        database = Database(settings)
-        await database.initialize()
-        
-        # Initialize services
-        data_service = DataService(settings, database)
-        geocoding_service = GeocodingService(settings, database)
-        optimization_service = OptimizationService(settings, database)
-        visualization_service = VisualizationService(settings)
-        monitoring = MonitoringSystem(settings)
-        
-        return (
-            settings,
-            database,
-            data_service,
-            geocoding_service,
-            optimization_service,
-            visualization_service,
-            monitoring
-        )
-    except Exception as e:
-        st.error(f"Failed to initialize services: {str(e)}")
-        raise
-
-class VRPOptimizerUI:
-    """Streamlit web interface for VRP Optimizer."""
-    
+class VRPOptimizerApp:
     def __init__(self):
-        """Initialize the UI and components."""
+        """Initialize the application."""
+        self.logger = logging.getLogger(__name__)
         self.route_map = RouteMap()
         self.metrics_panel = MetricsPanel()
         self.shipment_table = ShipmentTable()
-        
+        self.page_size = 10
+
+    async def async_initialize(self):
+        """Asynchronously initialize the application."""
+        try:
+            # Initialize settings
+            settings = Settings()
+            settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            self.logger.info("Settings loaded successfully")
+            
+            # Initialize database
+            database = await DatabaseConnection.get_instance(settings)
+            self.logger.info("Database initialized successfully")
+
+            # Initialize services
+            services = {
+                'data_service': DataService(settings, database),
+                'geocoding_service': GeocodingService(settings, database),
+                'optimization_service': OptimizationService(settings, database),
+                'visualization_service': VisualizationService(settings, database),
+                'monitoring': MonitoringSystem(settings),
+                'bi_service': BusinessIntelligenceService(settings=settings, database=database)
+            }
+
+            # Initialize each service
+            for name, service in services.items():
+                if hasattr(service, 'initialize'):
+                    await service.initialize()
+                self.logger.info(f"{name} initialized successfully")
+
+            return settings, database, services
+
+        except Exception as e:
+            self.logger.error(f"Failed to initialize application: {e}")
+            raise
+
     def initialize_session_state(self):
-        """Initialize or get session state variables."""
+        """Initialize the session state."""
         if 'initialized' not in st.session_state:
-            services = asyncio.run(initialize_services())
-            
-            st.session_state.settings = services[0]
-            st.session_state.database = services[1]
-            st.session_state.data_service = services[2]
-            st.session_state.geocoding_service = services[3]
-            st.session_state.optimization_service = services[4]
-            st.session_state.visualization_service = services[5]
-            st.session_state.monitoring = services[6]
-            
-            # Initialize solution states
-            st.session_state.current_solution = None
-            st.session_state.optimization_history = []
-            
-            st.session_state.initialized = True
+            try:
+                self.logger.info("Initializing session state")
+
+                # Run async initialization
+                settings, database, services = asyncio.run(self.async_initialize())
+
+                # Update session state
+                st.session_state.update({
+                    'settings': settings,
+                    'database': database,
+                    'data_service': services['data_service'],
+                    'geocoding_service': services['geocoding_service'],
+                    'optimization_service': services['optimization_service'],
+                    'visualization_service': services['visualization_service'],
+                    'monitoring': services['monitoring'],
+                    'bi_service': services['bi_service'],
+                    'initialized': True
+                })
+
+                self.logger.info("Session state initialized successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize application: {str(e)}")
+                raise
+
+    async def cleanup(self):
+        """Cleanup resources before exit."""
+        if hasattr(st.session_state, 'database'):
+            await st.session_state.database.cleanup()
 
     def run(self):
         """Run the Streamlit application."""
         try:
-            self._setup_page()
             self.initialize_session_state()
             
+            if not st.session_state.get('initialized'):
+                st.error("Application failed to initialize properly")
+                return
+
+            st.title("🚚 VRP Optimizer")
+            st.markdown("""
+            Optimize your vehicle routes with LIFO (Last-In-First-Out) constraints.
+            Upload your shipment data and get optimized routes instantly.
+            """)
             # Render sidebar
             self._render_sidebar()
             
@@ -122,275 +137,384 @@ class VRPOptimizerUI:
                 self._render_history_tab()
             with tabs[4]:
                 self._render_settings_tab()
-                
+
         except Exception as e:
             st.error(f"Application error: {str(e)}")
-            if st.session_state.get('monitoring'):
-                asyncio.run(
-                    st.session_state.monitoring.log_error(e)
-                )
-
-    def _setup_page(self):
-        """Configure page settings."""
-        st.set_page_config(
-            page_title="VRP Optimizer",
-            page_icon="🚚",
-            layout="wide",
-            initial_sidebar_state="expanded"
-        )
-        
-        st.title("🚚 VRP Optimizer")
-        st.markdown("""
-        Optimize your vehicle routes with LIFO (Last-In-First-Out) constraints.
-        Upload your shipment data and get optimized routes instantly.
-        """)
+            self.logger.error(f"Application error: {str(e)}", exc_info=True)
 
     def _render_sidebar(self):
-        """Render sidebar with controls and metrics."""
-        st.sidebar.header("Configuration")
-        
-        # Optimization parameters
-        st.sidebar.subheader("Parameters")
-        max_vehicles = st.sidebar.number_input(
-            "Maximum Vehicles",
-            min_value=1,
-            max_value=20,
-            value=st.session_state.settings.MAX_VEHICLES
-        )
-        
-        max_distance = st.sidebar.number_input(
-            "Maximum Route Distance (miles)",
-            min_value=100,
-            max_value=1000,
-            value=st.session_state.settings.MAX_DISTANCE
-        )
-        
-        # System metrics
-        st.sidebar.subheader("System Metrics")
-        metrics = asyncio.run(
-            st.session_state.monitoring.get_system_health()
-        )
-        
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            st.metric(
-                "Active Optimizations",
-                metrics.get('active_optimizations', 0)
-            )
-        with col2:
-            st.metric(
-                "Total Optimizations",
-                metrics.get('total_optimizations', 0)
-            )
-        
-        # Memory usage
-        memory_usage = metrics.get('memory_percent', 0)
-        st.sidebar.progress(
-            memory_usage / 100,
-            f"Memory Usage: {memory_usage:.1f}%"
-        )
-
-    async def _process_file(self, file) -> bool:
-        """Process uploaded file with error handling."""
-        try:
-            # Start monitoring
-            await st.session_state.monitoring.log_optimization_start(0)
-            start_time = time.time()
+        """Render the application sidebar."""
+        with st.sidebar:
+            st.header("⚙️ Controls")
             
-            # Read file
-            content = await file.read()
-            
-            # Process data
-            shipments = await st.session_state.data_service.process_excel(content)
-            if not shipments:
-                st.error("No valid shipments found in file")
-                return False
-            
-            # Update monitoring count
-            await st.session_state.monitoring.log_optimization_start(
-                len(shipments)
+            # Optimization Settings
+            st.subheader("Optimization Settings")
+            st.number_input(
+                "Max Vehicles",
+                min_value=1,
+                max_value=st.session_state.settings.MAX_VEHICLES,
+                value=5,
+                key="max_vehicles"
             )
             
-            # Geocode locations
-            shipments = await st.session_state.geocoding_service.geocode_shipments(
-                shipments
+            st.number_input(
+                "Max Pallets per Vehicle",
+                min_value=1,
+                max_value=26,  # Maximum pallets per vehicle
+                value=20,
+                key="max_pallets"
             )
             
-            # Optimize routes
-            solution = await st.session_state.optimization_service.optimize(
-                shipments
-            )
-            
-            if solution:
-                # Store solution
-                st.session_state.current_solution = solution
-                st.session_state.optimization_history.append({
-                    'timestamp': datetime.now(),
-                    'solution': solution
-                })
-                
-                # Cache solution in database
-                await st.session_state.database.save_solution(
-                    solution.to_dict(),
-                    {'processing_time': time.time() - start_time}
+            # Advanced Settings Expander
+            with st.expander("Advanced Settings"):
+                st.number_input(
+                    "Computation Time Limit (seconds)",
+                    min_value=10,
+                    max_value=st.session_state.settings.MAX_COMPUTATION_TIME,
+                    value=300,
+                    key="computation_time"
                 )
                 
-                # Log success
-                await st.session_state.monitoring.log_optimization_end(
-                    time.time() - start_time,
-                    True
+                max_distance = st.number_input(
+                    "Maximum Route Distance (miles)",
+                    min_value=100,
+                    max_value=5000,  # Updated to 5,000 miles
+                    value=st.session_state.settings.MAX_DISTANCE
                 )
-                
-                return True
+            
+            # System Status
+            st.subheader("System Status")
+            if st.session_state.get('monitoring'):
+                status = asyncio.run(st.session_state.monitoring.get_system_health())
+                st.write(f"Status: {'🟢 Healthy' if status.get('healthy', False) else '🔴 Issues Detected'}")
+                st.write(f"CPU Usage: {status.get('cpu_usage', 0)}%")
+                st.write(f"Memory Usage: {status.get('memory_usage', 0)}%")
             else:
-                st.error("No feasible solution found")
-                await st.session_state.monitoring.log_optimization_end(
-                    time.time() - start_time,
-                    False,
-                    "No feasible solution"
-                )
-                return False
-                
-        except Exception as e:
-            duration = time.time() - start_time
-            await st.session_state.monitoring.log_optimization_end(
-                duration,
-                False,
-                str(e)
-            )
-            raise
+                st.warning("Monitoring not initialized")
+            
+            # Help & Documentation
+            st.markdown("---")
+            st.markdown("[📚 Documentation](https://github.com/your-org/vrp-optimizer)")
+            st.markdown("[🐛 Report Issues](https://github.com/your-org/vrp-optimizer/issues)")
 
     def _render_upload_tab(self):
         """Render the data upload and optimization tab."""
         st.header("Upload Data & Optimize")
         
+        # File uploader for shipment data
         uploaded_file = st.file_uploader(
-            "Upload Shipment Data (Excel)",
-            type=['xlsx', 'xls'],
-            help="Upload an Excel file containing shipment data"
+            "Upload Shipment Data",
+            type=['xlsx', 'xls', 'csv'],
+            help="Upload an Excel or CSV file containing shipment data"
         )
-        
-        if uploaded_file:
+
+        # Upload settings in columns
+        col1, col2 = st.columns(2)
+        with col1:
+            validate_data = st.checkbox("Validate Data", value=True)
+        with col2:
+            auto_optimize = st.checkbox("Auto-Optimize", value=True)
+
+        # Process uploaded file
+        if uploaded_file is not None:
             try:
                 with st.spinner("Processing file..."):
-                    success = asyncio.run(self._process_file(uploaded_file))
-                    
-                if success:
-                    st.success("Routes optimized successfully!")
-                    self._display_solution_summary(
-                        st.session_state.current_solution
+                    # Process the file using the data service
+                    success = AsyncLoopManager.run_async(
+                        self._process_file(uploaded_file)
                     )
-                    
+
+                    if success:
+                        st.success("File processed successfully!")
+                        
+                        # Show optimization button if not auto-optimizing
+                        if not auto_optimize:
+                            if st.button("Optimize Routes"):
+                                with st.spinner("Optimizing routes..."):
+                                    solution = st.session_state.optimization_service.optimize(
+                                        st.session_state.current_shipments
+                                    )
+                                    st.session_state.current_solution = solution
+                        
+                        # Display solution if available
+                        if hasattr(st.session_state, 'current_solution'):
+                            self._display_solution_summary(st.session_state.current_solution)
+                            
+                            # Export buttons
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.button("Export to Excel"):
+                                    self._export_solution(
+                                        st.session_state.current_solution,
+                                        format='excel'
+                                    )
+                            with col2:
+                                if st.button("Export to CSV"):
+                                    self._export_solution(
+                                        st.session_state.current_solution,
+                                        format='csv'
+                                    )
+
             except Exception as e:
                 st.error(f"Error processing file: {str(e)}")
+                self.logger.error(f"File processing error: {str(e)}", exc_info=True)
 
     def _render_visualization_tab(self):
-        """Render the visualization tab."""
-        if not st.session_state.current_solution:
-            st.info("Please optimize routes first")
+        """Render the route visualization tab."""
+        st.header("Route Visualization")
+
+        # Check if there's a current solution to visualize
+        if not hasattr(st.session_state, 'current_solution'):
+            st.info("No routes to visualize. Please optimize routes first.")
             return
-            
-        self.route_map.render(st.session_state.current_solution)
-        self.metrics_panel.render(st.session_state.current_solution)
+
+        # Get the current solution
+        solution = st.session_state.current_solution
+
+        # Visualization options
+        col1, col2 = st.columns(2)
+        with col1:
+            show_markers = st.checkbox("Show Location Markers", value=True)
+        with col2:
+            show_routes = st.checkbox("Show Route Lines", value=True)
+
+        # Route selection
+        if solution.routes:
+            selected_route = st.selectbox(
+                "Select Route to Visualize",
+                options=range(len(solution.routes)),
+                format_func=lambda x: f"Route {x + 1}"
+            )
+
+            # Get selected route
+            route = solution.routes[selected_route]
+
+            # Display route details
+            st.subheader(f"Route {selected_route + 1} Details")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Distance", f"{route.total_distance:.1f} miles")
+            with col2:
+                st.metric("Total Time", f"{route.total_time:.1f} hours")
+            with col3:
+                st.metric("Load", f"{route.current_load}/{route.capacity} pallets")
+
+            # Display route map
+            try:
+                # Get route coordinates from visualization service
+                route_coords = st.session_state.visualization_service.get_route_coordinates(route)
+                
+                # Create and display map
+                self.route_map.plot_route(
+                    route_coords,
+                    show_markers=show_markers,
+                    show_routes=show_routes,
+                    route_color=st.session_state.visualization_service.get_route_color(selected_route)
+                )
+                
+                # Display shipment sequence
+                st.subheader("Delivery Sequence")
+                sequence_df = pd.DataFrame([
+                    {
+                        "Stop": i + 1,
+                        "Location": f"{stop.city}, {stop.state}",
+                        "Arrival Time": stop.arrival_time.strftime("%H:%M"),
+                        "Pallets": stop.load_change
+                    }
+                    for i, stop in enumerate(route.stops)
+                ])
+                st.dataframe(sequence_df, use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Error visualizing route: {str(e)}")
+                self.logger.error(f"Visualization error: {str(e)}", exc_info=True)
+        else:
+            st.info("No routes available in the current solution.")
+
+        # Advanced visualization options
+        with st.expander("Advanced Visualization Options"):
+            st.color_picker("Route Color", value="#FF4B4B")
+            st.slider("Line Thickness", min_value=1, max_value=10, value=3)
+            st.checkbox("Show Time Windows", value=False)
+            st.checkbox("Show Load Changes", value=False)
 
     def _render_analysis_tab(self):
-        """Render the analysis tab."""
-        if not st.session_state.current_solution:
-            st.info("Please optimize routes first")
-            return
+        """Render the analytics and reporting tab."""
+        st.header("Analytics & Insights")
+
+        try:
+            # Get metrics from BI service using AsyncLoopManager
+            with st.spinner("Loading analytics..."):
+                metrics = AsyncLoopManager.run_async(
+                    st.session_state.bi_service.get_optimization_metrics()
+                )
+                historical_data = AsyncLoopManager.run_async(
+                    st.session_state.bi_service.get_historical_metrics()
+                )
+
+            # Display high-level metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric(
+                    "Total Optimizations",
+                    metrics["total_optimizations"],
+                    help="Total number of route optimizations performed"
+                )
+            with col2:
+                st.metric(
+                    "Avg Distance (miles)",
+                    f"{metrics['average_distance']:.1f}",
+                    help="Average route distance across all optimizations"
+                )
+            with col3:
+                st.metric(
+                    "Avg Cost ($)",
+                    f"{metrics['average_cost']:.2f}",
+                    help="Average cost per route"
+                )
+            with col4:
+                st.metric(
+                    "Avg Vehicles Used",
+                    f"{metrics['average_vehicles']:.1f}",
+                    help="Average number of vehicles required"
+                )
+
+            # Performance trends
+            st.subheader("Performance Trends")
+            if historical_data is not None:
+                # Create trend charts
+                fig = self.metrics_panel.create_trend_charts(historical_data)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No historical data available for trend analysis.")
+
+            # Resource utilization
+            st.subheader("Resource Utilization")
             
-        solution = st.session_state.current_solution
-        
-        # Summary metrics
-        self.metrics_panel.render(solution)
-        
-        # Route details
-        st.subheader("Route Details")
-        self.shipment_table.render(solution)
+            # Get current system metrics
+            system_metrics = AsyncLoopManager.run_async(
+                st.session_state.monitoring.get_system_health()
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    "CPU Usage",
+                    f"{system_metrics.get('cpu_usage', 0):.1f}%"
+                )
+            with col2:
+                st.metric(
+                    "Memory Usage",
+                    f"{system_metrics.get('memory_usage', 0)::.1f}%"
+                )
+
+            # Export options
+            st.subheader("Export Analytics")
+            if st.button("Export Analytics"):
+                try:
+                    export_data = {
+                        "metrics": metrics,
+                        "historical_data": historical_data,
+                        "system_metrics": system_metrics
+                    }
+                    # Use DataService to handle the export
+                    success = AsyncLoopManager.run_async(
+                        st.session_state.data_service.export_analytics(export_data)
+                    )
+                    if success:
+                        st.success("Analytics exported successfully!")
+                    else:
+                        st.error("Failed to export analytics.")
+                except Exception as e:
+                    st.error(f"Error exporting analytics: {str(e)}")
+
+        except Exception as e:
+            st.error(f"Error loading analytics: {str(e)}")
+            self.logger.error(
+                f"Error in analysis tab: {str(e)}",
+                exc_info=True
+            )
 
     def _render_history_tab(self):
         """Render the optimization history tab."""
         st.header("Optimization History")
         
-        # Get recent solutions from database
-        solutions = asyncio.run(
-            st.session_state.database.get_recent_solutions()
-        )
-        
-        if not solutions:
-            st.info("No optimization history available")
-            return
+        try:
+            # Get recent optimizations from database
+            with st.spinner("Loading optimization history..."):
+                history = asyncio.run(
+                    st.session_state.database.get_recent_solutions(limit=10)
+                )
             
-        for solution in solutions:
-            with st.expander(
-                f"Solution from {solution['created_at']}"
-            ):
-                self._display_solution_summary(solution['solution'])
-                if solution['metrics']:
-                    st.metric(
-                        "Processing Time",
-                        f"{solution['metrics']['processing_time']:.2f}s"
-                    )
+            if not history:
+                st.info("No optimization history available.")
+                return
+
+            # Display history in a table
+            history_df = pd.DataFrame([
+                {
+                    "Date": h["created_at"].strftime("%Y-%m-%d %H:%M"),
+                    "Routes": len(h["solution"]["routes"]),
+                    "Total Distance": f"{h['solution']['total_distance']:.1f} miles",
+                    "Total Cost": f"${h['solution']['total_cost']:.2f}",
+                    "Status": "✅ Success" if h["solution"].get("success", False) else "❌ Failed"
+                }
+                for h in history
+            ])
+            
+            st.dataframe(history_df, use_container_width=True)
+
+            # Allow viewing detailed solution
+            if st.button("View Selected Solution Details"):
+                if "selected_solution" in st.session_state:
+                    self._display_solution_summary(st.session_state.selected_solution)
+                else:
+                    st.warning("Please select a solution to view details")
+
+        except Exception as e:
+            st.error(f"Error loading history: {str(e)}")
+            self.logger.error(f"History tab error: {str(e)}", exc_info=True)
 
     def _render_settings_tab(self):
-        """Render the settings tab."""
-        st.header("Settings")
+        """Render the application settings tab."""
+        st.header("Application Settings")
         
-        # General settings
-        st.subheader("General Settings")
-        max_vehicles = st.number_input(
-            "Maximum Vehicles",
+        # Display current settings
+        st.subheader("Current Configuration")
+        st.json({
+            "App Name": st.session_state.settings.APP_NAME,
+            "Environment": st.session_state.settings.ENVIRONMENT,
+            "Debug Mode": st.session_state.settings.DEBUG,
+            "Max Vehicles": st.session_state.settings.MAX_VEHICLES,
+            "Max Distance": st.session_state.settings.MAX_DISTANCE,
+            "Max Computation Time": st.session_state.settings.MAX_COMPUTATION_TIME,
+            "Geocoding Provider": st.session_state.settings.GEOCODING_API_KEY or "Not Set"
+        })
+
+        # Allow updates to settings
+        st.subheader("Update Settings")
+        new_max_vehicles = st.number_input(
+            "Max Vehicles",
             min_value=1,
-            max_value=20,
+            max_value=100,
             value=st.session_state.settings.MAX_VEHICLES
         )
-        
-        max_pallets = st.number_input(
-            "Maximum Pallets per Vehicle",
-            min_value=1,
-            max_value=50,
-            value=st.session_state.settings.MAX_PALLETS
+        new_max_distance = st.number_input(
+            "Max Distance (miles)",
+            min_value=100,
+            max_value=5000,
+            value=st.session_state.settings.MAX_DISTANCE
         )
         
-        # Export settings
-        st.subheader("Export Settings")
-        if st.button("Export Current Solution"):
-            if st.session_state.current_solution:
-                self._export_solution(st.session_state.current_solution)
-            else:
-                st.warning("No solution to export")
-
-    def _display_solution_summary(self, solution):
-        """Display a summary of the optimization solution."""
-        self.metrics_panel.render(solution)
-        self.shipment_table.render(solution)
-
-    async def _export_solution(self, solution):
-        """Export the solution to Excel with error handling."""
-        try:
-            excel_data = await st.session_state.data_service.export_solution(
-                solution,
-                'excel'
-            )
-            
-            if excel_data:
-                b64 = base64.b64encode(excel_data).decode()
-                href = f'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}'
-                st.markdown(
-                    f'<a href="{href}" download="route_solution.xlsx">'
-                    f'Download Solution (Excel)</a>',
-                    unsafe_allow_html=True
-                )
-            else:
-                st.error("Failed to export solution")
-                
-        except Exception as e:
-            st.error(f"Error exporting solution: {str(e)}")
-            await st.session_state.monitoring.log_error(e)
+        if st.button("Update Settings"):
+            st.session_state.settings.MAX_VEHICLES = new_max_vehicles
+            st.session_state.settings.MAX_DISTANCE = new_max_distance
+            st.success("Settings updated successfully!")
 
 def main():
-    app = VRPOptimizerUI()
+    """Initialize and run the Streamlit application."""
+    app = VRPOptimizerApp()
     app.run()
-
 if __name__ == "__main__":
     main()
+
