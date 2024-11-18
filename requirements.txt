@@ -17,7 +17,6 @@ anyio==4.6.2.post1
 asyncio==3.4.3
 asyncpg==0.30.0
 attrs==24.2.0
-black==23.9.1
 blinker==1.9.0
 branca==0.8.0
 cachetools==5.5.0
@@ -36,7 +35,6 @@ googlemaps==4.10.0
 greenlet==3.1.1
 h11==0.14.0
 httpcore==0.18.0
-httpx==0.25.0
 idna==3.10
 iniconfig==2.0.0
 Jinja2==3.1.4
@@ -49,11 +47,9 @@ MarkupSafe==3.0.2
 matplotlib==3.8.0  # Added for additional plotting capabilities
 mdurl==0.1.2
 multidict==6.1.0
-mypy==1.6.1
-mypy-extensions==1.0.0
 narwhals==1.13.4
 nest-asyncio==1.6.0
-ortools==9.6.2534
+ortools==9.11.4210
 packaging==24.2
 passlib==1.7.4
 pathspec==0.12.1
@@ -62,7 +58,10 @@ platformdirs==4.3.6
 pluggy==1.5.0
 prometheus_client==0.21.0
 propcache==0.2.0
-protobuf==5.28.3
+
+# Corrected protobuf version specification
+protobuf>=5.26.1,<5.27  # Fixed version range specification
+
 psutil==6.1.0
 pyarrow==18.0.0
 pycparser==2.22
@@ -73,8 +72,6 @@ pydeck==0.9.1
 Pygments==2.18.0
 PyJWT==2.9.0
 PyMySQL==1.1.1
-pytest==7.4.2
-pytest-asyncio==0.21.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-multipart==0.0.17

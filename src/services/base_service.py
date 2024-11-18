@@ -35,10 +35,6 @@ class BaseService:
             await self._initialize()
             self._initialized = True
 
-    async def cleanup(self):
-        """Cleanup resources before exit."""
-        pass  # Implement cleanup logic if necessary
-
     async def _initialize(self) -> None:
         """Initialize service resources."""
         try:

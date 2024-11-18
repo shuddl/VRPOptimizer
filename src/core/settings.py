@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # Monitoring settings
     MONITORING_ENABLED: bool = Field(default=True, env="MONITORING_ENABLED")
+    MEMORY_LIMIT_MB: int = 1024  # Default to 1GB
 
     # Security settings
     JWT_SECRET_KEY: str = Field(..., env="JWT_SECRET_KEY")
@@ -57,6 +58,12 @@ class Settings(BaseSettings):
 
     # Cache settings
     CACHE_TTL: int = Field(default=2592000, env="CACHE_TTL")  # 30 days in seconds
+
+    # Visualization settings
+    VISUALIZATION_CPU_LIMIT: int = 100  # Example default value (adjust as needed)
+    VISUALIZATION_MEMORY_LIMIT: int = (
+        32768  # Example default value in MB (adjust as needed)
+    )
 
     class Config:
         env_file = ".env"

@@ -16,12 +16,12 @@ from src.api import app
 __version__ = "1.0.0"
 
 __all__ = [
-    'Settings',
-    'DatabaseConnection',
-    'DataService',
-    'GeocodingService',
-    'OptimizationService',
-    'VisualizationService',
-    'BusinessIntelligenceService',
-    'MonitoringSystem',
+    "Settings",
+    "DatabaseConnection",
+    "DataService",
+    "GeocodingService",
+    "OptimizationService",
+    "VisualizationService",
+    "BusinessIntelligenceService",
+    "MonitoringSystem",
 ]

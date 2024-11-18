@@ -31,10 +31,13 @@ class MonitoringSystem:
             self.logger = structlog.get_logger(__name__)
             self.metrics = {}
             self._setup_metrics()
-            self.monitoring_thread = threading.Thread(
-                target=self.monitor_system, daemon=True
-            )
-            self.monitoring_thread.start()
+
+            # Validate resource limits for VisualizationService
+            self._validate_resource_limits()
+
+            # Create an event loop for the monitoring task
+            self.loop = asyncio.new_event_loop()
+            self.monitoring_task = self.loop.create_task(self.monitor_system())
             self.__class__._initialized = True
 
     def _setup_metrics(self):
@@ -42,7 +45,10 @@ class MonitoringSystem:
         # Clear any existing metrics with same names
         for metric in list(REGISTRY._names_to_collectors.keys()):
             if metric.startswith("vrp_"):
-                REGISTRY.unregister(REGISTRY._names_to_collectors[metric])
+                try:
+                    REGISTRY.unregister(REGISTRY._names_to_collectors[metric])
+                except KeyError:
+                    pass  # Metric not registered; ignore
 
         # Initialize new metrics
         self.metrics = {
@@ -63,8 +69,31 @@ class MonitoringSystem:
             "cpu_usage": Gauge("vrp_cpu_usage_percent", "Current CPU usage percentage"),
         }
 
+    def _validate_resource_limits(self):
+        """Validate and adjust resource limits for VisualizationService."""
+        # Example resource limits (replace with actual settings)
+        max_cpu_limit = 100  # Example maximum CPU limit
+        max_memory_limit = 32768  # Example maximum memory limit in MB
+
+        cpu_limit = getattr(self.settings, "VISUALIZATION_CPU_LIMIT", max_cpu_limit)
+        memory_limit = getattr(
+            self.settings, "VISUALIZATION_MEMORY_LIMIT", max_memory_limit
+        )
+
+        if cpu_limit > max_cpu_limit:
+            self.logger.warning(
+                f"Invalid CPU limit value: {cpu_limit}. Using system default {max_cpu_limit}."
+            )
+            self.settings.VISUALIZATION_CPU_LIMIT = max_cpu_limit
+
+        if memory_limit > max_memory_limit:
+            self.logger.warning(
+                f"Invalid memory limit value: {memory_limit}. Using system default {max_memory_limit}."
+            )
+            self.settings.VISUALIZATION_MEMORY_LIMIT = max_memory_limit
+
     async def monitor_system(self):
-        """Background thread to monitor system resources."""
+        """Background task to monitor system resources."""
         while True:
             try:
                 memory = psutil.virtual_memory()
@@ -134,10 +163,10 @@ class MonitoringSystem:
         else:
             self.logger.error("Optimization failed", duration=duration, error=error)
 
-    def log_error(self, error: Exception):
-        """Log an error within the monitoring system."""
-        self.logger.error("An error occurred", error=str(error))
-        # Increment an error counter if desired
+    def clear_cache(self):
+        """Clear the monitoring system's cache."""
+        self.cache = {}
+        self.logger.info("Monitoring cache cleared successfully")
 
 
 # streamlit_app.py
@@ -167,3 +196,5 @@ def _display_solution_summary(services, solution):
     """Display a summary of the optimization solution."""
     services.metrics_panel.render(solution)
     services.shipment_table.render(solution)
+
+    # [Rest of the code remains unchanged...]

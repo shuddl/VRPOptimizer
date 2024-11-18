@@ -52,7 +52,6 @@ chart_studio.{submodule} module instead.
 
 
 def _chart_studio_deprecation(fn):
-
     fn_name = fn.__name__
     fn_module = fn.__module__
     plotly_name = ".".join(["plotly"] + fn_module.split(".")[1:] + [fn_name])

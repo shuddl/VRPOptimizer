@@ -25,11 +25,11 @@ if t.TYPE_CHECKING:
     from .environment import Environment
 
     class _MemcachedClient(te.Protocol):
-        def get(self, key: str) -> bytes: ...
+        def get(self, key: str) -> bytes:
+            ...
 
-        def set(
-            self, key: str, value: bytes, timeout: t.Optional[int] = None
-        ) -> None: ...
+        def set(self, key: str, value: bytes, timeout: t.Optional[int] = None) -> None:
+            ...
 
 
 bc_version = 5

@@ -10,14 +10,14 @@ from src.monitoring.monitoring import MonitoringSystem
 from src.services.business_intelligence_service import BusinessIntelligenceService
 
 __all__ = [
-    'Settings',
-    'DatabaseConnection',
-    'DataService',
-    'GeocodingService',
-    'OptimizationService',
-    'VisualizationService',
-    'BusinessIntelligenceService',
-    'MonitoringSystem',
+    "Settings",
+    "DatabaseConnection",
+    "DataService",
+    "GeocodingService",
+    "OptimizationService",
+    "VisualizationService",
+    "BusinessIntelligenceService",
+    "MonitoringSystem",
 ]
 
 

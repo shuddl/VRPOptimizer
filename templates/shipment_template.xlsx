@@ -1,0 +1,10 @@
+[Create an Excel file with the following columns and save it in the templates directory.]
+
+Columns:
+
+- Shipment ID
+- Origin ZIP Code
+- Destination ZIP Code
+- Pallets
+- Delivery Window Start (optional)
+- Delivery Window End (optional)

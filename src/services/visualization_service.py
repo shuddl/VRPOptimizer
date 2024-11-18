@@ -21,13 +21,13 @@ from src.core.settings import Settings
 import pandas as pd
 
 
-
 class VisualizationService(BaseService):
     """Production-ready visualization service with resource management."""
 
     def __init__(self, settings: Settings, database: DatabaseConnection):
         super().__init__(settings, database)
         self.temp_dir = Path(tempfile.mkdtemp())
+        self._limits_set = False  # Add flag to track initialization
         self._setup_resource_limits()
 
     def __del__(self):
@@ -39,13 +39,43 @@ class VisualizationService(BaseService):
 
     def _setup_resource_limits(self):
         """Set resource limits for visualization processes."""
+        if self._limits_set:  # Skip if already set
+            return
+
         try:
-            memory_limit = (
-                self.settings.MEMORY_LIMIT_MB * 1024 * 1024
-            )  # Convert MB to bytes
-            resource.setrlimit(resource.RLIMIT_AS, (memory_limit, -1))
-        except Exception as e:
-            self.logger.warning(f"Could not set resource limits: {str(e)}")
+            import resource  # Ensure resource module is imported
+
+            # Get current limits
+            current_soft, current_hard = resource.getrlimit(resource.RLIMIT_AS)
+
+            # Calculate desired limit in bytes
+            desired_limit = self.settings.MEMORY_LIMIT_MB * 1024 * 1024
+
+            # Handle unlimited hard limit (-1 or RLIM_INFINITY)
+            if current_hard in (-1, resource.RLIM_INFINITY):
+                # Set both soft and hard limits to the desired limit
+                new_limits = (desired_limit, desired_limit)
+            else:
+                # Use the minimum of desired limit and hard limit
+                new_limits = (min(desired_limit, current_hard), current_hard)
+
+            # Only set if the new soft limit is different
+            if new_limits[0] != current_soft:
+                resource.setrlimit(resource.RLIMIT_AS, new_limits)
+                self.logger.info(
+                    f"Resource limits set to {new_limits[0] / (1024 * 1024):.1f}MB"
+                )
+
+        except ValueError as ve:
+            self.logger.warning(
+                f"Invalid resource limit value: {str(ve)}. Using system defaults."
+            )
+        except resource.error as re:
+            self.logger.warning(
+                f"Could not set resource limits: {str(re)}. Using system defaults."
+            )
+
+        self._limits_set = True  # Mark as set after successful initialization
 
     async def create_route_map(
         self, solution: Solution

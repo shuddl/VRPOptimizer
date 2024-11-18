@@ -14,9 +14,12 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.core.settings import Settings
-from src.database.database import Base  # Ensure Base is imported from the correct module
+from src.database.database import (
+    Base,
+)  # Ensure Base is imported from the correct module
 
 print(f"Environment DATABASE_URL: {os.environ.get('DATABASE_URL')}")
+
 
 async def main():
     """Initialize the database."""
@@ -36,8 +39,10 @@ async def main():
     except Exception as e:
         print(f"Error initializing database: {str(e)}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

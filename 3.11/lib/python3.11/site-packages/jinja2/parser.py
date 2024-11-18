@@ -459,7 +459,8 @@ class Parser:
     @typing.overload
     def parse_assign_target(
         self, with_tuple: bool = ..., name_only: "te.Literal[True]" = ...
-    ) -> nodes.Name: ...
+    ) -> nodes.Name:
+        ...
 
     @typing.overload
     def parse_assign_target(
@@ -468,7 +469,8 @@ class Parser:
         name_only: bool = False,
         extra_end_rules: t.Optional[t.Tuple[str, ...]] = None,
         with_namespace: bool = False,
-    ) -> t.Union[nodes.NSRef, nodes.Name, nodes.Tuple]: ...
+    ) -> t.Union[nodes.NSRef, nodes.Name, nodes.Tuple]:
+        ...
 
     def parse_assign_target(
         self,

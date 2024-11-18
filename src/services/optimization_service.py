@@ -14,9 +14,10 @@ from datetime import datetime
 from src.services.cache_manager import CacheManager
 from src.services.custom_constraint_manager import CustomConstraintManager
 
+
 class OptimizationService(BaseService):
     """Production-ready optimization service with resource monitoring."""
-    
+
     def __init__(self, settings: Settings, database: DatabaseConnection):
         super().__init__(settings, database)
         self.memory_monitor = MonitoringSystem(settings)  # Pass 'settings' here
@@ -24,11 +25,11 @@ class OptimizationService(BaseService):
         self.custom_constraint_manager = CustomConstraintManager()
 
     def optimize(self, shipments: List[Shipment]) -> Optional[Solution]:
-        """Optimize routes with resource monitoring and safety checks."""
+        """Optimize routes considering both origin and destination."""
         try:
             # Start resource monitoring
             self.memory_monitor.start()
-            
+
             # Validate input
             if len(shipments) > self.settings.MAX_SHIPMENTS:
                 raise ResourceExhaustedError(
@@ -37,12 +38,10 @@ class OptimizationService(BaseService):
 
             # Create data model
             data = self._create_data_model(shipments)
-            
+
             # Create routing model
             manager = pywrapcp.RoutingIndexManager(
-                len(data['distance_matrix']),
-                data['num_vehicles'],
-                data['depot']
+                len(data["distance_matrix"]), data["num_vehicles"], data["depot"]
             )
             routing = pywrapcp.RoutingModel(manager)
 
@@ -82,15 +81,14 @@ class OptimizationService(BaseService):
         except Exception as e:
             self.logger.error(f"Optimization error: {str(e)}")
             raise OptimizationError(str(e))
-            
+
         finally:
             # Stop resource monitoring
             self.memory_monitor.stop()
-            
+
             # Log resource usage
             self.logger.info(
-                "Resource usage stats: %s",
-                self.memory_monitor.get_stats_summary()
+                "Resource usage stats: %s", self.memory_monitor.get_stats_summary()
             )
 
     def _create_data_model(self, shipments: List[Shipment]) -> Dict:
@@ -98,15 +96,24 @@ class OptimizationService(BaseService):
         # Implementation here...
         pass
 
-    def _get_transit_callback(self, data: Dict, manager: pywrapcp.RoutingIndexManager,
-                            from_index: int, to_index: int) -> int:
+    def _get_transit_callback(
+        self,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+        from_index: int,
+        to_index: int,
+    ) -> int:
         """Distance callback implementation."""
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return data['distance_matrix'][from_node][to_node]
+        return data["distance_matrix"][from_node][to_node]
 
-    def _add_capacity_constraint(self, routing: pywrapcp.RoutingModel,
-                               data: Dict, manager: pywrapcp.RoutingIndexManager):
+    def _add_capacity_constraint(
+        self,
+        routing: pywrapcp.RoutingModel,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+    ):
         """Add capacity constraints to the routing model."""
         capacity_callback = lambda from_index: self._get_demand_callback(
             data, manager, from_index
@@ -117,19 +124,28 @@ class OptimizationService(BaseService):
         routing.AddDimensionWithVehicleCapacity(
             capacity_callback_index,
             0,  # null capacity slack
-            [self.settings.MAX_PALLETS] * data['num_vehicles'],  # vehicle maximum capacities
+            [self.settings.MAX_PALLETS]
+            * data["num_vehicles"],  # vehicle maximum capacities
             True,  # start cumul to zero
-            'Capacity'
+            "Capacity",
         )
 
-    def _add_lifo_constraints(self, routing: pywrapcp.RoutingModel,
-                            data: Dict, manager: pywrapcp.RoutingIndexManager):
+    def _add_lifo_constraints(
+        self,
+        routing: pywrapcp.RoutingModel,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+    ):
         """Add LIFO constraints to the routing model."""
         # Implementation here...
         pass
 
-    def _add_time_windows_constraints(self, routing: pywrapcp.RoutingModel,
-                                      data: Dict, manager: pywrapcp.RoutingIndexManager):
+    def _add_time_windows_constraints(
+        self,
+        routing: pywrapcp.RoutingModel,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+    ):
         """Add delivery time window constraints."""
         time_callback = lambda from_index, to_index: self._get_time_callback(
             data, manager, from_index, to_index
@@ -140,15 +156,20 @@ class OptimizationService(BaseService):
             30,  # Allow 30-minute slack
             self.settings.MAX_ROUTE_TIME,
             True,  # Force start cumul to zero
-            'Time'
+            "Time",
         )
 
-    def _get_time_callback(self, data: Dict, manager: pywrapcp.RoutingIndexManager,
-                           from_index: int, to_index: int) -> int:
+    def _get_time_callback(
+        self,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+        from_index: int,
+        to_index: int,
+    ) -> int:
         """Time callback implementation."""
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return data['time_matrix'][from_node][to_node]
+        return data["time_matrix"][from_node][to_node]
 
     def _get_search_parameters(self) -> pywrapcp.DefaultRoutingSearchParameters:
         """Create search parameters."""
@@ -163,9 +184,13 @@ class OptimizationService(BaseService):
         search_parameters.log_search = True
         return search_parameters
 
-    def _create_solution(self, data: Dict, manager: pywrapcp.RoutingIndexManager,
-                        routing: pywrapcp.RoutingModel,
-                        solution: pywrapcp.Assignment) -> Solution:
+    def _create_solution(
+        self,
+        data: Dict,
+        manager: pywrapcp.RoutingIndexManager,
+        routing: pywrapcp.RoutingModel,
+        solution: pywrapcp.Assignment,
+    ) -> Solution:
         """Create solution object from routing solution."""
         # Implementation here...
         pass
@@ -173,9 +198,9 @@ class OptimizationService(BaseService):
     def calculate_environmental_impact(self, solution: Solution) -> Dict[str, float]:
         """Calculate environmental metrics for routes."""
         return {
-            'co2_emissions': self._calculate_emissions(solution),
-            'fuel_consumption': self._estimate_fuel_usage(solution),
-            'green_score': self._calculate_sustainability_score(solution)
+            "co2_emissions": self._calculate_emissions(solution),
+            "fuel_consumption": self._estimate_fuel_usage(solution),
+            "green_score": self._calculate_sustainability_score(solution),
         }
 
     def _calculate_emissions(self, solution: Solution) -> float:

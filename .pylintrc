@@ -1,0 +1,6 @@
+
+[MASTER]
+# ...existing configuration...
+ignore=venv,.venv,site-packages,.git
+ignore-patterns=.*\.pyc,.*__pycache__.*,.*\.egg-info.*
+# ...existing configuration...

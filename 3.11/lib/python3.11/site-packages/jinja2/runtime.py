@@ -40,7 +40,8 @@ if t.TYPE_CHECKING:
             reciter: t.Iterable[V],
             loop_render_func: "LoopRenderFunc",
             depth: int = 0,
-        ) -> str: ...
+        ) -> str:
+            ...
 
 
 # these variables are exported to the template runtime

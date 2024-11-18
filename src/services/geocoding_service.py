@@ -35,7 +35,7 @@ class GeocodingService(BaseService):
                     socket_timeout=self.redis_settings["timeout"],
                     retry_on_timeout=True,
                     encoding="utf-8",
-                    decode_responses=True
+                    decode_responses=True,
                 )
             except Exception as e:
                 self.logger.error(f"Failed to initialize Redis connection: {str(e)}")
@@ -141,7 +141,7 @@ class GeocodingService(BaseService):
                 if cached:
                     lat, lng = map(float, cached.split(","))
                     return lat, lng
-            
+
             # Fallback to database cache
             return await self.database.get_cached_coordinates(cache_key)
         except Exception as e:
@@ -193,3 +193,15 @@ class GeocodingService(BaseService):
     async def some_async_method(self):
         await self.ensure_initialized()
         # ... other initialization
+
+    def geocode_zip_code(self, zip_code: str):
+        """Geocode a ZIP Code to a Location object."""
+        try:
+            # Use a geocoding API or database to get coordinates
+            result = self.gmaps.geocode(f"{zip_code}, USA")
+            if result and len(result) > 0:
+                location = result[0]["geometry"]["location"]
+                return Location(latitude=location["lat"], longitude=location["lng"])
+        except Exception as e:
+            self.logger.error(f"Geocoding error for ZIP Code {zip_code}: {str(e)}")
+        return None

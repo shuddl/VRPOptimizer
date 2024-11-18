@@ -20,7 +20,7 @@ def tripcolor(
     vmax: float | None = ...,
     shading: Literal["flat"] = ...,
     facecolors: ArrayLike | None = ...,
-    **kwargs
+    **kwargs,
 ) -> PolyCollection: ...
 @overload
 def tripcolor(
@@ -36,7 +36,7 @@ def tripcolor(
     vmax: float | None = ...,
     shading: Literal["flat"] = ...,
     facecolors: ArrayLike | None = ...,
-    **kwargs
+    **kwargs,
 ) -> PolyCollection: ...
 @overload
 def tripcolor(
@@ -51,7 +51,7 @@ def tripcolor(
     vmax: float | None = ...,
     shading: Literal["gouraud"],
     facecolors: ArrayLike | None = ...,
-    **kwargs
+    **kwargs,
 ) -> TriMesh: ...
 @overload
 def tripcolor(
@@ -67,5 +67,5 @@ def tripcolor(
     vmax: float | None = ...,
     shading: Literal["gouraud"],
     facecolors: ArrayLike | None = ...,
-    **kwargs
+    **kwargs,
 ) -> TriMesh: ...

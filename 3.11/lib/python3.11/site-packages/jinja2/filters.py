@@ -1370,11 +1370,13 @@ def do_mark_unsafe(value: str) -> str:
 
 
 @typing.overload
-def do_reverse(value: str) -> str: ...
+def do_reverse(value: str) -> str:
+    ...
 
 
 @typing.overload
-def do_reverse(value: "t.Iterable[V]") -> "t.Iterable[V]": ...
+def do_reverse(value: "t.Iterable[V]") -> "t.Iterable[V]":
+    ...
 
 
 def do_reverse(value: t.Union[str, t.Iterable[V]]) -> t.Union[str, t.Iterable[V]]:
@@ -1433,7 +1435,8 @@ def sync_do_map(
     name: str,
     *args: t.Any,
     **kwargs: t.Any,
-) -> t.Iterable[t.Any]: ...
+) -> t.Iterable[t.Any]:
+    ...
 
 
 @typing.overload
@@ -1443,7 +1446,8 @@ def sync_do_map(
     *,
     attribute: str = ...,
     default: t.Optional[t.Any] = None,
-) -> t.Iterable[t.Any]: ...
+) -> t.Iterable[t.Any]:
+    ...
 
 
 @pass_context
@@ -1503,7 +1507,8 @@ def do_map(
     name: str,
     *args: t.Any,
     **kwargs: t.Any,
-) -> t.Iterable[t.Any]: ...
+) -> t.Iterable[t.Any]:
+    ...
 
 
 @typing.overload
@@ -1513,7 +1518,8 @@ def do_map(
     *,
     attribute: str = ...,
     default: t.Optional[t.Any] = None,
-) -> t.Iterable[t.Any]: ...
+) -> t.Iterable[t.Any]:
+    ...
 
 
 @async_variant(sync_do_map)  # type: ignore

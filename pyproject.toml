@@ -9,7 +9,6 @@ description = "Vehicle Route Planning system with LIFO constraints optimization"
 authors = [
     { name = "shuddl", email = "spencer@shuddl.io" }
 ]
-description = "Vehicle Route Planning system with LIFO constraints optimization"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 license = {text = "MIT"}
@@ -20,7 +19,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Operations Research"
 ]
-license = {text = "MIT"}
 dependencies = [
     "pydantic==2.4.2",
     "fastapi==0.104.1",
@@ -73,3 +71,7 @@ asyncio_mode = "auto"
 [tool.coverage.run]
 source = ["src"]
 omit = ["tests/", "scripts/"]
+
+[tool.pylint.master]
+ignore = ["venv", ".venv", "site-packages", ".git"]
+ignore-patterns = [".*\\.pyc", ".*__pycache__.*", ".*\\.egg-info.*"]

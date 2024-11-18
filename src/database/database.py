@@ -50,14 +50,12 @@ class DatabaseConnection:
         try:
             if not self.engine:
                 # Configure engine based on database type
-                if self.settings.DATABASE_URL.startswith('sqlite'):
-                    # SQLite-specific configuration
+                if self.settings.DATABASE_URL.startswith("sqlite"):
                     self.engine = create_async_engine(
                         self.settings.DATABASE_URL,
                         echo=self.settings.DEBUG,
                     )
                 else:
-                    # Configuration for other databases (PostgreSQL, MySQL, etc.)
                     self.engine = create_async_engine(
                         self.settings.DATABASE_URL,
                         echo=self.settings.DEBUG,
@@ -66,10 +64,15 @@ class DatabaseConnection:
                         pool_timeout=self.settings.DB_POOL_TIMEOUT,
                         pool_recycle=self.settings.DB_POOL_RECYCLE,
                     )
-            
+
+                # Define SessionLocal after engine is created
+                self.SessionLocal = sessionmaker(
+                    self.engine, expire_on_commit=False, class_=AsyncSession
+                )
+
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-            
+
             self._initialized = True  # Set flag when initialization succeeds
             self.logger.info(f"Connected to database: {self.settings.DATABASE_URL}")
         except OperationalError as e:

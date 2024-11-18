@@ -17,14 +17,14 @@ class CacheManager:
         """Validate the Redis URL."""
         if not url:
             raise VRPOptimizerError("Redis URL is not set or is empty.")
-    
+
     async def initialize(self):
         """Initialize Redis connection."""
         try:
             self.redis_client = redis.from_url(
                 self._validate_redis_url(self.settings.REDIS_URL),
                 encoding="utf-8",
-                decode_responses=True
+                decode_responses=True,
             )
             # Test connection
             await self.redis_client.ping()
